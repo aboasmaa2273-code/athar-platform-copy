@@ -295,6 +295,17 @@ function atharUpsert_(user, entity, record, clientId) {
       if (String(existing.evaluatorId||'') !== String(user.userId)) throw new Error('لا يمكنك تعديل زيارة لا تخص حسابك.');
     }
   }
+  // Improvement plans have no evaluatorId in the legacy UI model. Stamp ownership
+  // server-side for evaluator-created plans and preserve it on subsequent edits.
+  if (user.role==='evaluator' && entity==='plans') {
+    if (row>0) {
+      const existing=JSON.parse(String(rows[row-1][ix.payload]||'{}'));
+      if (String(existing.evaluatorId||'') !== String(user.userId)) throw new Error('لا يمكنك تعديل خطة تطوير أنشأها مقيم آخر أو لم تُسند إلى حسابك.');
+      record.evaluatorId=String(user.userId);
+    } else {
+      record.evaluatorId=String(user.userId);
+    }
+  }
   const now=new Date().toISOString();
   const oldCreated=row>0?rows[row-1][ix.createdAt]:now;
   const data=[id,entity,user.schoolId,JSON.stringify(record),oldCreated,now,user.userId,''];

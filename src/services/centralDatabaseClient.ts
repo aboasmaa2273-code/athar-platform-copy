@@ -156,10 +156,16 @@ export class CentralDatabaseClient {
     }
   }
 
-  static async listRecords(entity: 'teachers' | 'visits' | 'plans' | 'settings' | 'visitors'): Promise<CentralApiResponse> {
+  static async listRecords<T = unknown>(entity: 'teachers' | 'visits' | 'plans' | 'settings' | 'visitors'): Promise<CentralApiResponse<T>> {
     const session = this.getSession();
     if (!session) return { success: false, error: 'انتهت جلسة الدخول المركزي أو لم يتم تسجيل الدخول.' };
-    return this.request({ action: 'list', entity, token: session.token, clientId: CLIENT_ID });
+    return this.request<T>({ action: 'list', entity, token: session.token, clientId: CLIENT_ID });
+  }
+
+  static async listAudit(): Promise<CentralApiResponse<{ records?: unknown[] }>> {
+    const session = this.getSession();
+    if (!session) return { success: false, error: 'انتهت جلسة الدخول المركزي أو لم يتم تسجيل الدخول.' };
+    return this.request({ action: 'audit', token: session.token, clientId: CLIENT_ID });
   }
 
   static async saveRecord(entity: 'teachers' | 'visits' | 'plans' | 'settings' | 'visitors', record: Record<string, unknown>): Promise<CentralApiResponse> {

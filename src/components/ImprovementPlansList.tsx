@@ -20,6 +20,8 @@ interface ImprovementPlansListProps {
   teachers: Teacher[];
   currentUser: User;
   onRefreshPlans: () => void;
+  onSavePlan?: (plan: Omit<ImprovementPlan, 'id' | 'createdAt'> & { id?: string }) => Promise<{ success: boolean; error?: string }>;
+  onUpdatePlanFollowUp?: (plan: ImprovementPlan, changes: Pick<ImprovementPlan, 'status' | 'followUpResult' | 'followUpNotes'>) => Promise<{ success: boolean; error?: string }>;
   initiallyOpenCreate?: boolean;
   language?: Language;
 }
@@ -29,6 +31,8 @@ export const ImprovementPlansList: React.FC<ImprovementPlansListProps> = ({
   teachers,
   currentUser,
   onRefreshPlans,
+  onSavePlan,
+  onUpdatePlanFollowUp,
   initiallyOpenCreate = false,
   language = 'ar'
 }) => {
@@ -81,12 +85,12 @@ export const ImprovementPlansList: React.FC<ImprovementPlansListProps> = ({
     return matchesSearch && matchesStatus;
   });
 
-  const handleCreatePlanSubmit = (e: React.FormEvent) => {
+  const handleCreatePlanSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     const tch = teachers.find(t => t.id === teacherId);
     if (!tch) return;
 
-    const res = AtharStorageService.savePlan({
+    const planPayload = {
       schoolId: 'sch_alsadara_01',
       teacherId: tch.id,
       teacherName: tch.fullName,
@@ -98,8 +102,9 @@ export const ImprovementPlansList: React.FC<ImprovementPlansListProps> = ({
       responsiblePerson,
       duration,
       followUpDate,
-      status: 'in_progress'
-    });
+      status: 'in_progress' as const
+    };
+    const res = onSavePlan ? await onSavePlan(planPayload) : AtharStorageService.savePlan(planPayload);
 
     if (res.success) {
       setIsCreateModalOpen(false);
@@ -117,15 +122,14 @@ export const ImprovementPlansList: React.FC<ImprovementPlansListProps> = ({
     setIsFollowUpModalOpen(true);
   };
 
-  const handleFollowUpSubmit = (e: React.FormEvent) => {
+  const handleFollowUpSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedPlanForFollowUp) return;
 
-    const res = AtharStorageService.updatePlanFollowUp(selectedPlanForFollowUp.id, {
-      status: followUpStatus,
-      followUpResult,
-      followUpNotes
-    });
+    const changes = { status: followUpStatus, followUpResult, followUpNotes };
+    const res = onUpdatePlanFollowUp
+      ? await onUpdatePlanFollowUp(selectedPlanForFollowUp, changes)
+      : AtharStorageService.updatePlanFollowUp(selectedPlanForFollowUp.id, changes);
 
     if (res.success) {
       setIsFollowUpModalOpen(false);

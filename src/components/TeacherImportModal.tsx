@@ -2,11 +2,14 @@ import React, { useState } from 'react';
 import { Upload, Download, AlertTriangle, CheckCircle2, FileText, X } from 'lucide-react';
 import { AtharStorageService } from '../services/storageService';
 import { translations, Language } from '../i18n/translations';
+import { Teacher } from '../types';
 
 interface TeacherImportModalProps {
   isOpen: boolean;
   onClose: () => void;
   onImportComplete: () => void;
+  existingTeachers?: Teacher[];
+  onImportTeachers?: (rows: Array<{ fullName: string; jobNumber: string; specialization: string; email: string; phone: string }>) => Promise<{ importedCount: number; rejectedCount: number; errors: string[] }>;
   language?: Language;
 }
 
@@ -14,6 +17,8 @@ export const TeacherImportModal: React.FC<TeacherImportModalProps> = ({
   isOpen,
   onClose,
   onImportComplete,
+  existingTeachers,
+  onImportTeachers,
   language = 'ar'
 }) => {
   const [csvText, setCsvText] = useState('');
@@ -72,8 +77,8 @@ Michael Taylor,10970,Arabic Language,m.taylor@alsadara.edu.ae,0504445566`
 
     const rows: any[] = [];
     const errors: string[] = [];
-    const existingTeachers = AtharStorageService.getTeachers();
-    const existingJobNumbers = new Set(existingTeachers.map(t => t.jobNumber.trim()));
+    const directory = existingTeachers || AtharStorageService.getTeachers();
+    const existingJobNumbers = new Set(directory.map(t => t.jobNumber.trim()));
     const seenBatchJobNumbers = new Set<string>();
 
     for (let i = 1; i < lines.length; i++) {
@@ -133,22 +138,23 @@ Michael Taylor,10970,Arabic Language,m.taylor@alsadara.edu.ae,0504445566`
     setValidationErrors(errors);
   };
 
-  const handleExecuteImport = () => {
+  const handleExecuteImport = async () => {
     const validRows = parsedRows.filter(r => r.isValid);
     if (validRows.length === 0) {
       alert(isEn ? 'No valid records found to import!' : 'لا توجد سجلات صالحة للاستيراد!');
       return;
     }
 
-    const result = AtharStorageService.bulkImportTeachers(
-      validRows.map(r => ({
-        fullName: r.fullName,
-        jobNumber: r.jobNumber,
-        specialization: r.specialization,
-        email: r.email,
-        phone: r.phone
-      }))
-    );
+    const rows = validRows.map(r => ({
+      fullName: r.fullName,
+      jobNumber: r.jobNumber,
+      specialization: r.specialization,
+      email: r.email,
+      phone: r.phone
+    }));
+    const result = onImportTeachers
+      ? await onImportTeachers(rows)
+      : AtharStorageService.bulkImportTeachers(rows);
 
     setImportResult({
       imported: result.importedCount,

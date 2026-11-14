@@ -313,7 +313,7 @@ export default function App() {
 
         {isLoggedIn && activeTab === 'new-visit' && (
           <VisitForm
-            currentUser={currentUser}
+            currentUser={appUser}
             teachers={teachers}
             academicSettings={academicSettings}
             editingVisit={editingVisit}

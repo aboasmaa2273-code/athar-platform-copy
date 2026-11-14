@@ -50,6 +50,7 @@ interface VisitFormProps {
   academicSettings: AcademicSettings;
   editingVisit?: ClassroomVisit | null;
   onSaveSuccess: (savedVisit: ClassroomVisit) => void;
+  onSaveVisit?: (visit: ClassroomVisit) => Promise<{ success: boolean; visit?: ClassroomVisit; error?: string }>;
   onCancel: () => void;
   language?: Language;
 }
@@ -60,6 +61,7 @@ export const VisitForm: React.FC<VisitFormProps> = ({
   academicSettings,
   editingVisit,
   onSaveSuccess,
+  onSaveVisit,
   onCancel,
   language = 'ar'
 }) => {
@@ -579,9 +581,9 @@ export const VisitForm: React.FC<VisitFormProps> = ({
   };
 
   // Save handler
-  const saveVisitToStorage = (finalStatus: ClassroomVisit['status'], isExplicitFinish: boolean) => {
+  const saveVisitToStorage = async (finalStatus: ClassroomVisit['status'], isExplicitFinish: boolean) => {
     const visitObj = buildVisitObject(finalStatus);
-    const res = AtharStorageService.saveVisit(visitObj);
+    const res = onSaveVisit ? await onSaveVisit(visitObj) : AtharStorageService.saveVisit(visitObj);
 
     if (res.success) {
       setAutoSaveStatus('saved');

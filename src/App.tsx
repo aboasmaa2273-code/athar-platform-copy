@@ -354,7 +354,7 @@ export default function App() {
               return result;
             }}
             onUpdatePlanFollowUp={async (plan, changes) => {
-              if (!centralSessionMatches) return AtharStorageService.updatePlanFollowUp(plan.id, changes);
+              if (!centralSessionMatches) return AtharStorageService.updatePlanFollowUp(plan.id, { status: changes.status, followUpResult: changes.followUpResult || '', followUpNotes: changes.followUpNotes || '' });
               const result = await CentralDataRepository.updatePlanFollowUp(plan, changes);
               if (result.success) await refreshAllData(appUser);
               return result;

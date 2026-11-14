@@ -1,5 +1,5 @@
 import { AuditLogEntry, ClassroomVisit, ImprovementPlan, Teacher } from '../types';
-import { CentralDatabaseClient, CentralSessionUser } from './centralDatabaseClient';
+import { CentralApiResponse, CentralDatabaseClient, CentralSessionUser } from './centralDatabaseClient';
 
 type CentralRecord<T> = {
   recordId: string;
@@ -51,9 +51,10 @@ export class CentralDataRepository {
     try {
       const user = this.getSignedInUser();
       if (!user) throw new Error('انتهت الجلسة المركزية؛ سجّل الدخول مجدداً.');
+      const emptyTeachersResult: CentralApiResponse<{ records?: unknown[] }> = { success: true, records: [] };
       const [teachersResult, visitsResult, plansResult] = await Promise.all([
         user.role === 'teacher'
-          ? Promise.resolve({ success: true, records: [] } as { success: boolean; records: unknown[] })
+          ? Promise.resolve(emptyTeachersResult)
           : CentralDatabaseClient.listRecords<{ records?: unknown[] }>('teachers'),
         CentralDatabaseClient.listRecords<{ records?: unknown[] }>('visits'),
         CentralDatabaseClient.listRecords<{ records?: unknown[] }>('plans')

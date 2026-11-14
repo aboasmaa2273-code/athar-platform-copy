@@ -376,7 +376,11 @@ function atharApiWrite_(b) {
     if(user.role==='teacher' && entity==='teachers') throw new Error('دليل المعلمين متاح للإدارة والمقيمين المخولين فقط.');
     if(!['teachers','visits','plans','settings','visitors'].includes(entity)) throw new Error('نوع السجل غير مدعوم.');
     let records=atharRows_(entity,user.schoolId,false);
-    if(user.role==='evaluator' && entity==='visits') records=records.filter(x=>String(x.payload.evaluatorId)===user.userId);
+    // Evaluators may only retrieve records explicitly assigned to their own account.
+    // Apply the same ownership rule to improvement plans; never expose the school's full plan register.
+    if(user.role==='evaluator' && (entity==='visits' || entity==='plans')) {
+      records=records.filter(x=>String(x.payload.evaluatorId||'')===String(user.userId));
+    }
     if(user.role==='teacher') {
       const jobNumber = String(user.jobNumber || '').trim();
       if (!jobNumber) throw new Error('لم يُربط الرقم الوظيفي بحساب المعلم؛ راجع إدارة المنصة قبل عرض التقارير.');

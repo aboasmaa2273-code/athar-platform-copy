@@ -174,6 +174,13 @@ export class CentralDatabaseClient {
     return this.request({ action: 'upsert', entity, record, token: session.token, clientId: CLIENT_ID });
   }
 
+  static async deleteRecord(entity: 'teachers' | 'settings' | 'visitors', id: string): Promise<CentralApiResponse> {
+    const session = this.getSession();
+    if (!session) return { success: false, error: 'انتهت جلسة الدخول المركزي أو لم يتم تسجيل الدخول.' };
+    if (!id) return { success: false, error: 'معرّف السجل مطلوب.' };
+    return this.request({ action: 'delete', entity, id, token: session.token, clientId: CLIENT_ID });
+  }
+
 
   /** استيراد دفعات محلية بعد تسجيل دخول مسؤول مركزي؛ حد أقصى 100 سجل للطلب. */
   /** Central account administration; authorization is enforced again by Apps Script. */

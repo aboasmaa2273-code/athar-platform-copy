@@ -21,6 +21,10 @@ interface TeachersListProps {
   teachers: Teacher[];
   currentUser: User;
   onRefreshTeachers: () => void;
+  onSaveTeacher?: (teacher: Omit<Teacher, 'id' | 'dateAdded'> & { id?: string }) => Promise<{ success: boolean; error?: string }>;
+  onToggleTeacherStatus?: (id: string) => Promise<{ success: boolean; error?: string }>;
+  onDeleteTeacher?: (id: string) => Promise<{ success: boolean; error?: string }>;
+  onImportTeachers?: (rows: Array<{ fullName: string; jobNumber: string; specialization: string; email: string; phone: string }>) => Promise<{ importedCount: number; rejectedCount: number; errors: string[] }>;
   onOpenTeacherReport: (teacher: Teacher) => void;
   language?: Language;
 }
@@ -29,6 +33,10 @@ export const TeachersList: React.FC<TeachersListProps> = ({
   teachers,
   currentUser,
   onRefreshTeachers,
+  onSaveTeacher,
+  onToggleTeacherStatus,
+  onDeleteTeacher,
+  onImportTeachers,
   onOpenTeacherReport,
   language = 'ar'
 }) => {
@@ -96,7 +104,7 @@ export const TeachersList: React.FC<TeachersListProps> = ({
     setIsEditModalOpen(true);
   };
 
-  const handleSaveTeacher = (e: React.FormEvent) => {
+  const handleSaveTeacher = async (e: React.FormEvent) => {
     e.preventDefault();
     setFormError('');
 
@@ -105,7 +113,7 @@ export const TeachersList: React.FC<TeachersListProps> = ({
       return;
     }
 
-    const res = AtharStorageService.saveTeacher({
+    const teacherPayload = {
       id: editingTeacher?.id,
       schoolId: 'sch_alsadara_01',
       fullName: fullName.trim(),
@@ -113,8 +121,9 @@ export const TeachersList: React.FC<TeachersListProps> = ({
       specialization: specialization.trim(),
       email: email.trim(),
       phone: phone.trim(),
-      status: editingTeacher ? editingTeacher.status : 'active'
-    });
+      status: editingTeacher ? editingTeacher.status : 'active' as const
+    };
+    const res = onSaveTeacher ? await onSaveTeacher(teacherPayload) : AtharStorageService.saveTeacher(teacherPayload);
 
     if (res.success) {
       setIsEditModalOpen(false);
@@ -124,8 +133,8 @@ export const TeachersList: React.FC<TeachersListProps> = ({
     }
   };
 
-  const handleToggleStatus = (id: string) => {
-    const res = AtharStorageService.toggleTeacherStatus(id);
+  const handleToggleStatus = async (id: string) => {
+    const res = onToggleTeacherStatus ? await onToggleTeacherStatus(id) : AtharStorageService.toggleTeacherStatus(id);
     if (res.success) {
       onRefreshTeachers();
     } else {
@@ -133,11 +142,11 @@ export const TeachersList: React.FC<TeachersListProps> = ({
     }
   };
 
-  const handleDeleteTeacher = (teacherId: string, teacherName: string) => {
+  const handleDeleteTeacher = async (teacherId: string, teacherName: string) => {
     if (!confirm(isEn ? `Are you sure you want to delete teacher ${teacherName}? This action is restricted to authorized leadership.` : `هل أنت متأكد من رغبتك في حذف المعلم (${teacherName}) نهائياً؟ هذا الإجراء مقتصر على القيادة المدرسية المخولة فقط.`)) {
       return;
     }
-    const res = AtharStorageService.deleteTeacher(teacherId);
+    const res = onDeleteTeacher ? await onDeleteTeacher(teacherId) : AtharStorageService.deleteTeacher(teacherId);
     if (res.success) {
       onRefreshTeachers();
     } else {

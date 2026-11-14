@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { CentralDatabaseClient } from '../services/centralDatabaseClient';
+import { CentralDataRepository, CentralDiagnostics } from '../services/centralDataRepository';
 import { AtharStorageService } from '../services/storageService';
 import { GAS_FILES, GasFile } from '../services/gasCodeGenerator';
 import { 
@@ -33,6 +34,7 @@ export const GasIntegrationHub: React.FC<GasIntegrationHubProps> = ({ language =
   const [centralBusy, setCentralBusy] = useState(false);
   const [migrationMessage, setMigrationMessage] = useState('');
   const [migrationProgress, setMigrationProgress] = useState(0);
+  const [diagnostics, setDiagnostics] = useState<CentralDiagnostics | null>(null);
   
 
   const localMigrationRecords = () => ([
@@ -52,14 +54,30 @@ export const GasIntegrationHub: React.FC<GasIntegrationHubProps> = ({ language =
       return;
     }
     const session = CentralDatabaseClient.getSession();
-    if (!session || !['platform_admin', 'school_admin'].includes(session.user.role)) {
-      await CentralDatabaseClient.logout();
+    if (!session) {
       setCentralUserName('');
-      setMigrationMessage(isAr ? 'الاستيراد متاح لمسؤول المنصة أو مسؤول المدرسة فقط.' : 'Migration requires a platform or school administrator.');
+      setMigrationMessage(isAr ? 'تعذر استعادة الجلسة المركزية.' : 'Could not restore central session.');
       return;
     }
     setCentralUserName(session.user.name);
-    setMigrationMessage(isAr ? 'تم التحقق من حساب المسؤول المركزي. يمكنك الآن مراجعة عدد السجلات قبل الاستيراد.' : 'Central administrator verified. Review the record count before migration.');
+    setDiagnostics(null);
+    setMigrationMessage(isAr
+      ? `تم التحقق من الجلسة المركزية بصلاحية: ${session.user.role}. الاستيراد وإدارة الحسابات يظلان مقتصرين على الإدارة المخولة.`
+      : `Central session verified: ${session.user.role}. Migration and account administration remain restricted to authorized administrators.`);
+  };
+
+  const handleRunDiagnostics = async () => {
+    setCentralBusy(true);
+    setDiagnostics(null);
+    const result = await CentralDataRepository.runReadOnlyDiagnostics();
+    setCentralBusy(false);
+    if (result.success && result.result) {
+      setDiagnostics(result.result);
+      setMigrationMessage(isAr ? 'اكتملت اختبارات القراءة والصلاحيات دون تعديل أي سجل.' : 'Read and permission diagnostics completed without modifying records.');
+    } else {
+      setDiagnostics(result.result || null);
+      setMigrationMessage(result.error || (isAr ? 'فشل اختبار الاسترجاع أو الصلاحيات.' : 'Retrieval or permission test failed.'));
+    }
   };
 
   const handleCentralLogout = async () => {
@@ -183,7 +201,7 @@ export const GasIntegrationHub: React.FC<GasIntegrationHubProps> = ({ language =
         </div>
         {centralUserName ? (
           <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg bg-emerald-50 border border-emerald-200 p-3">
-            <span className="font-bold text-emerald-800">{isAr ? 'مسؤول مركزي متصل: ' : 'Central admin signed in: '}{centralUserName}</span>
+            <span className="font-bold text-emerald-800">{isAr ? 'الجلسة المركزية نشطة: ' : 'Central session active: '}{centralUserName}</span>
             <button type="button" disabled={centralBusy} onClick={handleCentralLogout} className="rounded-lg border border-slate-300 px-3 py-2 font-bold">{isAr ? 'تسجيل الخروج المركزي' : 'Central sign out'}</button>
           </div>
         ) : (
@@ -204,7 +222,35 @@ export const GasIntegrationHub: React.FC<GasIntegrationHubProps> = ({ language =
         <p className="text-[11px] leading-5 text-amber-800 bg-amber-50 border border-amber-200 rounded-lg p-3">{isAr ? 'مهم: هذه العملية تنسخ المعلمين والزيارات والخطط فقط، ولا تنقل حسابات المستخدمين أو كلمات المرور أو إعدادات المنصة. راجع الأعداد وتأكد من اتصال الخادم قبل البدء. لا تعتمد النسخة المركزية نهائيًا قبل اختبار الاسترجاع من جهاز آخر.' : 'Important: this copies teachers, visits, and plans only. It does not migrate user accounts, passwords, or platform settings. Verify the counts and connection first; do not rely on the central copy until retrieval is tested from another device.'}</p>
       </div>
 
-      {centralUserName && <CentralUsersPanel language={language} />}
+      {centralUserName && (
+        <div className="space-y-4">
+          <div className="rounded-xl border border-[#C6A66A]/40 bg-white p-5 shadow-sm space-y-3">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div>
+                <h3 className="font-black text-[#172C40] text-base">{isAr ? 'اختبار استرجاع البيانات وعزل الصلاحيات' : 'Data Retrieval & Permission Isolation Test'}</h3>
+                <p className="text-slate-500 mt-1">{isAr ? 'اختبار قراءة فقط؛ لا ينشئ أو يعدّل أو يحذف أي سجل.' : 'Read-only checks; no records are created, edited, or deleted.'}</p>
+              </div>
+              <button type="button" disabled={centralBusy} onClick={handleRunDiagnostics} className="rounded-lg bg-[#172C40] px-4 py-2 text-white font-bold disabled:opacity-50">
+                {centralBusy ? (isAr ? 'جارٍ الاختبار...' : 'Testing...') : (isAr ? 'تشغيل الاختبارات' : 'Run diagnostics')}
+              </button>
+            </div>
+            {diagnostics && (
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                <div className="rounded-lg bg-slate-50 p-3"><span className="text-slate-500">{isAr ? 'المعلمون' : 'Teachers'}</span><div className="text-xl font-black">{diagnostics.counts.teachers}</div></div>
+                <div className="rounded-lg bg-slate-50 p-3"><span className="text-slate-500">{isAr ? 'الزيارات' : 'Visits'}</span><div className="text-xl font-black">{diagnostics.counts.visits}</div></div>
+                <div className="rounded-lg bg-slate-50 p-3"><span className="text-slate-500">{isAr ? 'خطط التطوير' : 'Plans'}</span><div className="text-xl font-black">{diagnostics.counts.plans}</div></div>
+                <div className="sm:col-span-3 rounded-lg border border-slate-200 p-3 space-y-1">
+                  <p>{isAr ? 'ثبات الاسترجاع بين قراءتين: ' : 'Stable repeated retrieval: '}{diagnostics.stableRead ? '✓' : '✗'}</p>
+                  <p>{isAr ? 'التحقق من ملكية السجلات: ' : 'Record ownership verified: '}{diagnostics.ownershipVerified ? '✓' : '✗'}</p>
+                  {diagnostics.teacherDirectoryBlocked !== null && <p>{isAr ? 'منع المعلم من قراءة دليل المعلمين: ' : 'Teacher directory access blocked: '}{diagnostics.teacherDirectoryBlocked ? '✓' : '✗'}</p>}
+                  {diagnostics.errors.map((error, index) => <p key={index} className="text-red-700">{error}</p>)}
+                </div>
+              </div>
+            )}
+          </div>
+          {['platform_admin', 'school_admin'].includes(CentralDatabaseClient.getSession()?.user.role || '') && <CentralUsersPanel language={language} />}
+        </div>
+      )}
 
       {/* Code Inspector & Copy Center */}
       <div className="bg-white border border-[#E2E8F0] rounded-xl shadow-sm overflow-hidden grid grid-cols-1 lg:grid-cols-12">

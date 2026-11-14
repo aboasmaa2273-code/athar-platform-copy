@@ -24,6 +24,8 @@ interface TeachersListProps {
   onSaveTeacher?: (teacher: Omit<Teacher, 'id' | 'dateAdded'> & { id?: string }) => Promise<{ success: boolean; error?: string }>;
   onToggleTeacherStatus?: (id: string) => Promise<{ success: boolean; error?: string }>;
   onDeleteTeacher?: (id: string) => Promise<{ success: boolean; error?: string }>;
+  canManageDirectory?: boolean;
+  canDeleteDirectory?: boolean;
   onImportTeachers?: (rows: Array<{ fullName: string; jobNumber: string; specialization: string; email: string; phone: string }>) => Promise<{ importedCount: number; rejectedCount: number; errors: string[] }>;
   onOpenTeacherReport: (teacher: Teacher) => void;
   language?: Language;
@@ -37,6 +39,8 @@ export const TeachersList: React.FC<TeachersListProps> = ({
   onToggleTeacherStatus,
   onDeleteTeacher,
   onImportTeachers,
+  canManageDirectory,
+  canDeleteDirectory,
   onOpenTeacherReport,
   language = 'ar'
 }) => {
@@ -60,8 +64,8 @@ export const TeachersList: React.FC<TeachersListProps> = ({
   const t = translations[language];
   const isEn = language === 'en';
 
-  const canManage = AtharStorageService.canManageTeachers(currentUser);
-  const canDeleteTeacher = AtharStorageService.canDeleteTeacher(currentUser);
+  const canManage = canManageDirectory ?? AtharStorageService.canManageTeachers(currentUser);
+  const canDeleteTeacher = canDeleteDirectory ?? AtharStorageService.canDeleteTeacher(currentUser);
   const isTeacher = currentUser.role === 'teacher';
 
   // Filtered teachers list

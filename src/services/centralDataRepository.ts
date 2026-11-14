@@ -1,4 +1,4 @@
-import { AcademicSettings, AuditLogEntry, ClassroomVisit, ImprovementPlan, PlatformSettings, Teacher } from '../types';
+import { AuditLogEntry, ClassroomVisit, ImprovementPlan, Teacher } from '../types';
 import { CentralDatabaseClient, CentralSessionUser } from './centralDatabaseClient';
 
 type CentralRecord<T> = {
@@ -20,7 +20,7 @@ export type CentralDataSnapshot = {
 const isObject = (value: unknown): value is Record<string, unknown> =>
   Boolean(value) && typeof value === 'object' && !Array.isArray(value);
 
-function unwrapRecords<T extends { id?: string }>(value: unknown, entity: string): T[] {
+function unwrapRecords<T extends { id?: string }>(value: unknown): T[] {
   if (!Array.isArray(value)) throw new Error('استجابة السجلات المركزية غير صالحة.');
   return value.map((item) => {
     if (!isObject(item) || !isObject(item.payload)) {
@@ -49,8 +49,12 @@ export class CentralDataRepository {
   static async loadSnapshot(): Promise<{ success: true; data: CentralDataSnapshot } | { success: false; error: string }> {
     if (!this.isReady()) return { success: false, error: 'يجب تسجيل الدخول المركزي أولاً.' };
     try {
+      const user = this.getSignedInUser();
+      if (!user) throw new Error('انتهت الجلسة المركزية؛ سجّل الدخول مجدداً.');
       const [teachersResult, visitsResult, plansResult] = await Promise.all([
-        CentralDatabaseClient.listRecords<{ records?: unknown[] }>('teachers'),
+        user.role === 'teacher'
+          ? Promise.resolve({ success: true, records: [] } as { success: boolean; records: unknown[] })
+          : CentralDatabaseClient.listRecords<{ records?: unknown[] }>('teachers'),
         CentralDatabaseClient.listRecords<{ records?: unknown[] }>('visits'),
         CentralDatabaseClient.listRecords<{ records?: unknown[] }>('plans')
       ]);
@@ -58,9 +62,9 @@ export class CentralDataRepository {
         if (!result.success) throw new Error(result.error || 'تعذر جلب السجلات المركزية.');
       }
       const data: CentralDataSnapshot = {
-        teachers: unwrapRecords<Teacher>(teachersResult.records, 'teachers'),
-        visits: unwrapRecords<ClassroomVisit>(visitsResult.records, 'visits'),
-        plans: unwrapRecords<ImprovementPlan>(plansResult.records, 'plans')
+        teachers: unwrapRecords<Teacher>(teachersResult.records),
+        visits: unwrapRecords<ClassroomVisit>(visitsResult.records),
+        plans: unwrapRecords<ImprovementPlan>(plansResult.records)
       };
       return { success: true, data };
     } catch (error) {
@@ -119,14 +123,5 @@ export class CentralDataRepository {
       details: String(row.details || row[6] || '')
     }));
     return { success: true, records };
-  }
-
-  // Settings remain intentionally separate until their local shape and central schema are reconciled.
-  static settingsAreSupported(): boolean {
-    return false;
-  }
-
-  static localSettingsRemainUntouched(_academic: AcademicSettings, _platform: PlatformSettings): true {
-    return true;
   }
 }

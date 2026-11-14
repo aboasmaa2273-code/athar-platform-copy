@@ -222,6 +222,7 @@ export default function App() {
             auditLogs={auditLogs}
             onOpenVisitReport={(v) => setSelectedVisitForReport(v)}
             onDeleteRecords={(visitIds, planIds) => {
+              if (centralSessionMatches) return { success: false, visitsDeleted: 0, plansDeleted: 0, error: 'الحذف المباشر للسجلات المركزية غير مفعّل؛ استخدم إجراء الأرشفة المعتمد بعد إضافته إلى الخادم.' };
               const visitResult = AtharStorageService.deleteSelectedVisits(visitIds);
               if (!visitResult.success) return { success: false, visitsDeleted: 0, plansDeleted: 0, error: visitResult.error };
               const planResult = AtharStorageService.deleteSelectedPlans(planIds);
@@ -308,7 +309,7 @@ export default function App() {
               setEditingVisit(null);
               setActiveTab('new-visit');
             }}
-            onRefreshVisits={refreshAllData}
+            onRefreshVisits={() => { void refreshAllData(appUser); }}
             language={language}
           />
         )}
@@ -423,8 +424,9 @@ export default function App() {
           platformSettings={platformSettings}
           onClose={() => setSelectedVisitForReport(null)}
           language={language}
-          canDelete={currentUser.role !== 'teacher'}
+          canDelete={!centralSessionMatches && currentUser.role !== 'teacher'}
           onDeleteReport={(visitId) => {
+            if (centralSessionMatches) { alert('الحذف المباشر للزيارات المركزية غير متاح حالياً؛ لم يتم حذف أي سجل.'); return; }
             const res = AtharStorageService.deleteVisit(visitId);
             if (res.success) {
               refreshAllData();

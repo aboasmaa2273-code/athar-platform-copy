@@ -3,6 +3,8 @@
  * ينقل الطلبات عبر نموذج POST وإطار مخفي؛ لا يضع أسرارًا أو كلمات مرور في عنوان URL.
  */
 const CONFIG_KEY = 'athar_central_database_endpoint_v1';
+// Default central Apps Script endpoint for the published Ather deployment.
+const DEFAULT_CENTRAL_ENDPOINT = 'https://script.google.com/macros/s/AKfycby0GnPx90wkpyZewfID_vDFMYlKm054lNebVhYgRd5nUqZrOOKqauobVr4XjKiJQD3M/exec';
 const RESPONSE_TYPE = 'ATHAR_DB_RESULT';
 const TRUSTED_PARENT_ORIGIN = 'https://aboasmaa2273-code.github.io';
 
@@ -32,7 +34,7 @@ const CLIENT_ID = 'ather-web-client';
 
 export class CentralDatabaseClient {
   static getEndpoint(): string {
-    try { return localStorage.getItem(CONFIG_KEY) || ''; } catch { return ''; }
+    try { return localStorage.getItem(CONFIG_KEY) || DEFAULT_CENTRAL_ENDPOINT; } catch { return DEFAULT_CENTRAL_ENDPOINT; }
   }
 
   static setEndpoint(value: string): { success: boolean; error?: string } {

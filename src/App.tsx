@@ -269,6 +269,8 @@ export default function App() {
               if (result.success) await refreshAllData(appUser);
               return result;
             }}
+            canManageDirectory={centralSessionMatches ? ['platform_admin', 'school_admin'].includes(CentralDataRepository.getSignedInUser()?.role || '') : undefined}
+            canDeleteDirectory={centralSessionMatches ? ['platform_admin', 'school_admin'].includes(CentralDataRepository.getSignedInUser()?.role || '') : undefined}
             onImportTeachers={async (rows) => {
               if (!centralSessionMatches) {
                 const result = AtharStorageService.bulkImportTeachers(rows);

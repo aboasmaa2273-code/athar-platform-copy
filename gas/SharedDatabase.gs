@@ -508,3 +508,20 @@ function atharApiWrite_(b) {
   if(b.action==='logout') { CacheService.getScriptCache().remove('athar_session_'+b.token); atharAudit_(user,'تسجيل خروج','session',user.userId,'تسجيل خروج.',b.clientId); return {success:true}; }
   throw new Error('طلب كتابة غير معروف.');
 }
+
+
+/**
+ * فحص آمن عند فتح رابط تطبيق الويب مباشرة.
+ * لا يقرأ جدول البيانات ولا يعرض بيانات أو إعدادات حساسة ولا يغيّر أي سجل.
+ */
+function doGet(e) {
+  return ContentService
+    .createTextOutput(JSON.stringify({
+      success: true,
+      service: 'ATHAR_CENTRAL_DB',
+      status: 'online',
+      message: 'خادم أَثَر المركزي يستجيب لطلبات الفحص.',
+      serverTime: new Date().toISOString()
+    }))
+    .setMimeType(ContentService.MimeType.JSON);
+}

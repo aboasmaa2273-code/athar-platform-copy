@@ -102,7 +102,11 @@ export class CentralDatabaseClient {
           trustedGoogleOrigin = host === 'script.google.com' ||
             host === 'script.googleusercontent.com';
         } catch { /* reject opaque or malformed origins */ }
-        if (!trustedGoogleOrigin || event.source !== iframe.contentWindow) return;
+        // Apps Script may serve the HTML response through a redirected Google
+        // response frame. Validate the Google origin and this request's
+        // cryptographically random correlation ID; do not require WindowProxy
+        // identity, which can be unreliable across that redirect flow.
+        if (!trustedGoogleOrigin) return;
         const data = event.data;
         if (!data || data.type !== RESPONSE_TYPE || data.requestId !== requestId) return;
         finish(data.payload as CentralApiResponse<T>);

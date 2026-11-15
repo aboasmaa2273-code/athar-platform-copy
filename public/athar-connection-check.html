@@ -1,0 +1,35 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>فحص اتصال أَثَر</title>
+<style>
+body{font-family:system-ui,sans-serif;max-width:760px;margin:40px auto;padding:0 18px;line-height:1.8;color:#18212f}
+main{border:1px solid #d8dee8;border-radius:16px;padding:24px}
+button{border:0;border-radius:10px;padding:12px 20px;background:#174b42;color:#fff;font-size:16px;cursor:pointer}
+pre{white-space:pre-wrap;overflow-wrap:anywhere;background:#f3f5f7;padding:14px;border-radius:10px;min-height:70px}
+.small{color:#586575;font-size:14px}
+</style>
+</head>
+<body><main>
+<h1>فحص اتصال قاعدة بيانات أَثَر</h1>
+<p>هذا اختبار تشخيصي آمن يرسل طلب <b>ping</b> فقط إلى وسيط الاتصال. لا يسجل الدخول ولا يقرأ أو يكتب أي بيانات.</p>
+<button id="run">اختبار الاتصال الآن</button>
+<p id="status" role="status">لم يبدأ الاختبار بعد.</p>
+<pre id="result">بانتظار الاختبار…</pre>
+<p class="small">مسار الاختبار: POST /api/athar — action: ping</p>
+</main>
+<script>
+const btn=document.getElementById('run'), status=document.getElementById('status'), out=document.getElementById('result');
+btn.addEventListener('click',async()=>{
+ btn.disabled=true; status.textContent='جارٍ اختبار الاتصال…'; out.textContent='';
+ try{
+  const r=await fetch('/api/athar',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'ping',clientId:'ather-diagnostic'}) ,cache:'no-store'});
+  const raw=await r.text(); let data;
+  try{data=JSON.parse(raw)}catch{data={rawResponse:raw.slice(0,1500)}}
+  status.textContent='استجابة HTTP: '+r.status+' '+r.statusText;
+  out.textContent=JSON.stringify(data,null,2);
+ }catch(e){status.textContent='فشل طلب الاتصال';out.textContent=String(e)}
+ finally{btn.disabled=false}
+});
+</script></body></html>

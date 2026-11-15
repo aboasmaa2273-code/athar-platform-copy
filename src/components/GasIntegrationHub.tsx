@@ -43,6 +43,21 @@ export const GasIntegrationHub: React.FC<GasIntegrationHubProps> = ({ language =
     ...AtharStorageService.getPlans().map(record => ({ entity: 'plans' as const, record: record as unknown as Record<string, unknown> }))
   ]);
 
+  const handleSaveEndpoint = () => {
+    const result = CentralDatabaseClient.setEndpoint(endpoint);
+    if (!result.success) {
+      setConnectionMessage(result.error || (language === 'ar' ? 'تعذر حفظ رابط الخادم.' : 'Could not save the server URL.'));
+      return;
+    }
+    const savedEndpoint = CentralDatabaseClient.getEndpoint();
+    if (savedEndpoint !== endpoint.trim()) {
+      setConnectionMessage(language === 'ar' ? 'لم يتم تأكيد حفظ الرابط في هذا المتصفح. تحقق من إعدادات التخزين ثم أعد المحاولة.' : 'The browser did not confirm saving this URL. Check browser storage settings and try again.');
+      return;
+    }
+    setEndpoint(savedEndpoint);
+    setConnectionMessage(language === 'ar' ? 'تم حفظ رابط الخادم بنجاح في هذا المتصفح. اضغط «اختبار الاتصال» للتحقق من استجابة الخادم.' : 'Server URL saved in this browser. Select “Test connection” to verify the server response.');
+  };
+
   const handleCentralLogin = async () => {
     setCentralBusy(true);
     setMigrationMessage('');
@@ -185,7 +200,7 @@ export const GasIntegrationHub: React.FC<GasIntegrationHubProps> = ({ language =
         </div>
         <div className="flex flex-col md:flex-row gap-2">
           <input value={endpoint} onChange={e => setEndpoint(e.target.value)} dir="ltr" placeholder="https://script.google.com/macros/s/.../exec" className="flex-1 min-w-0 rounded-lg border border-slate-300 px-3 py-2 text-xs font-mono focus:outline-none focus:ring-2 focus:ring-[#C6A66A]" />
-          <button type="button" onClick={() => { const r=CentralDatabaseClient.setEndpoint(endpoint); setConnectionMessage(r.success ? (isAr ? 'حُفظ رابط الخادم في هذا المتصفح. اختبر الاتصال للتحقق من عمله.' : 'Endpoint saved in this browser. Test the connection to verify it.') : (r.error || 'Invalid URL')); }} className="rounded-lg bg-[#172C40] text-white px-4 py-2 text-xs font-bold">{isAr ? 'حفظ الرابط' : 'Save URL'}</button>
+          <button type="button" onClick={handleSaveEndpoint} className="rounded-lg bg-[#172C40] text-white px-4 py-2 text-xs font-bold cursor-pointer hover:bg-[#101F2D] focus:outline-none focus:ring-2 focus:ring-[#C6A66A]">{isAr ? 'حفظ الرابط' : 'Save URL'}</button>
           <button type="button" disabled={testingConnection || !CentralDatabaseClient.getEndpoint()} onClick={async () => { setTestingConnection(true); setConnectionMessage(''); const r=await CentralDatabaseClient.testConnection(); setTestingConnection(false); setConnectionMessage(r.success ? (isAr ? 'نجح الاتصال بالخادم المركزي. لم تُنقل أو تُعدّل أي بيانات.' : 'Central server connected. No data was migrated or changed.') : (r.error || 'Connection failed')); }} className="rounded-lg border border-[#C6A66A] bg-[#F2EBDD] text-[#172C40] px-4 py-2 text-xs font-bold disabled:opacity-50">{testingConnection ? (isAr ? 'جارٍ الاختبار...' : 'Testing...') : (isAr ? 'اختبار الاتصال' : 'Test connection')}</button>
         </div>
         {connectionMessage && <p role="status" className="text-xs font-bold text-slate-700 bg-slate-50 border border-slate-200 rounded-lg p-3">{connectionMessage}</p>}

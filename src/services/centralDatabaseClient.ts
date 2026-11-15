@@ -83,40 +83,44 @@ export class CentralDatabaseClient {
 
     return new Promise(resolve => {
       let settled = false;
+      let iframeLoaded = false;
+      const observedMessages: string[] = [];
       const finish = (result: CentralApiResponse<T>) => {
         if (settled) return;
         settled = true;
         window.removeEventListener('message', onMessage);
+        iframe.removeEventListener('load', onFrameLoad);
         window.clearTimeout(timer);
         form.remove();
         iframe.remove();
         resolve(result);
       };
+      const onFrameLoad = () => { iframeLoaded = true; };
       const onMessage = (event: MessageEvent) => {
-        // Apps Script may serve the POST response from a regional
-        // script.googleusercontent.com subdomain after redirecting.
-        // Trust only the Apps Script hosts, then require this request's random ID.
+        // Record only non-sensitive message metadata to diagnose failed handshakes.
+        const data = event.data;
+        const messageType = data && typeof data.type === 'string' ? data.type : typeof data;
+        const requestMatches = !!data && data.requestId === requestId;
+        observedMessages.push(`origin=${event.origin || '(empty)'},type=${messageType},requestMatch=${requestMatches}`);
+        if (observedMessages.length > 5) observedMessages.shift();
+
         let trustedGoogleOrigin = false;
         try {
           const host = new URL(event.origin).hostname.toLowerCase();
           trustedGoogleOrigin = host === 'script.google.com' ||
             host === 'script.googleusercontent.com' ||
             host.endsWith('.script.googleusercontent.com');
-        } catch { /* reject opaque or malformed origins */ }
-        // Apps Script HtmlService can deliver its response from a nested
-        // sandbox frame whose origin is opaque ("null") and whose WindowProxy
-        // is not the outer form-target iframe. Accept Google origins, or an
-        // opaque-origin message only after matching this request's unguessable
-        // correlation ID and response type.
-        const data = event.data;
-        if (!data || data.type !== RESPONSE_TYPE || data.requestId !== requestId) return;
+        } catch { /* opaque origins are checked below */ }
+        // Apps Script HtmlService can use nested opaque-origin sandbox frames.
+        if (!data || data.type !== RESPONSE_TYPE || !requestMatches) return;
         if (!trustedGoogleOrigin && event.origin !== 'null') return;
         finish(data.payload as CentralApiResponse<T>);
       };
-      const timer = window.setTimeout(
-        () => finish({ success: false, error: 'انتهت مهلة الاتصال بالخادم. تحقق من رابط النشر وصلاحية الوصول.' }),
-        timeoutMs
-      );
+      const timer = window.setTimeout(() => {
+        const details = `تحميل إطار الرد: ${iframeLoaded ? 'نعم' : 'لا'}؛ رسائل مستلمة: ${observedMessages.length ? observedMessages.join(' | ') : 'لا توجد'}`;
+        finish({ success: false, error: `انتهت مهلة الاتصال بالخادم. (${details})` });
+      }, timeoutMs);
+      iframe.addEventListener('load', onFrameLoad);
       window.addEventListener('message', onMessage);
       try { form.submit(); }
       catch { finish({ success: false, error: 'تعذر إرسال الطلب إلى خادم قاعدة البيانات.' }); }

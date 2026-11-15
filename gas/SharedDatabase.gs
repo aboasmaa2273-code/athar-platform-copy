@@ -346,7 +346,7 @@ function doPost(e) {
   const requestId=JSON.stringify(requestIdValue);
   // The client communicates through a hidden cross-origin iframe. The response
   // contains no UI or secrets and posts only to the fixed trusted Pages origin.
-  return HtmlService.createHtmlOutput('<!doctype html><meta charset="utf-8"><script>parent.postMessage({type:"ATHAR_DB_RESULT",requestId:'+requestId+',payload:'+safe+'},"https://aboasmaa2273-code.github.io");</script>')
+  return HtmlService.createHtmlOutput('<!doctype html><meta charset="utf-8"><script>window.top.postMessage({type:"ATHAR_DB_RESULT",requestId:'+requestId+',payload:'+safe+'},"https://aboasmaa2273-code.github.io");</script>')
     .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
 }
 function atharApiWrite_(b) {

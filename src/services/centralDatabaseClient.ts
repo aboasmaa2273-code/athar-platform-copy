@@ -48,16 +48,17 @@ export class CentralDatabaseClient {
   }
 
   static async request<T = unknown>(payload: Record<string, unknown>, timeoutMs = 20000): Promise<CentralApiResponse<T>> {
-    const endpoint = this.getEndpoint();
-    if (!endpoint) return { success: false, error: 'لم يُضبط رابط قاعدة البيانات المركزية بعد.' };
     if (typeof window === 'undefined') {
       return { success: false, error: 'تعذر تحديد نافذة المنصة.' };
     }
-    // Enabled only in the separate Cloudflare Pages build; GitHub Pages stays unchanged.
+    // In the Cloudflare build, the upstream endpoint is held server-side;
+    // no browser-local Apps Script URL is required.
     const transport = (import.meta as ImportMeta & { env?: Record<string, string | undefined> }).env?.VITE_ATHAR_API_TRANSPORT;
     if (transport === 'proxy') {
       return this.requestViaProxy<T>(payload, timeoutMs);
     }
+    const endpoint = this.getEndpoint();
+    if (!endpoint) return { success: false, error: 'لم يُضبط رابط قاعدة البيانات المركزية بعد.' };
     if (window.location.origin !== TRUSTED_PARENT_ORIGIN) {
       return { success: false, error: 'اتصال قاعدة البيانات متاح من نطاق منصة أَثَر المنشور فقط.' };
     }

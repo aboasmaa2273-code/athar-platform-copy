@@ -10,22 +10,25 @@ function jsonResponse(body: Record<string, unknown>, status = 200): Response {
 }
 
 type PagesFunctionContext<E> = { request: Request; env: E };
+
 function extractLegacyGasPayload(html: string): Record<string, unknown> | null {
-  // Older deployed Apps Script versions return an HTML page whose script
-  // posts the operation result to the parent window. Extract only that JSON
-  // object; never execute the returned HTML or its script.
+  // Extract the JSON data embedded in the legacy Apps Script postMessage
+  // envelope. Never execute returned HTML or JavaScript.
   const marker = "payload:";
-  const startMarker = html.indexOf(marker);
-  if (startMarker < 0) return null;
-  let start = startMarker + marker.length;
-  while (/\\s/.test(html[start] || "")) start++;
+  const markerIndex = html.indexOf(marker);
+  if (markerIndex < 0) return null;
+  let start = markerIndex + marker.length;
+  while (/\s/.test(html[start] || "")) start++;
   if (html[start] !== "{") return null;
-  let depth = 0, inString = false, escaped = false;
+
+  let depth = 0;
+  let inString = false;
+  let escaped = false;
   for (let i = start; i < html.length; i++) {
     const ch = html[i];
     if (inString) {
       if (escaped) escaped = false;
-      else if (ch === "\\\\") escaped = true;
+      else if (ch === "\\") escaped = true;
       else if (ch === '"') inString = false;
       continue;
     }
@@ -39,13 +42,14 @@ function extractLegacyGasPayload(html: string): Record<string, unknown> | null {
           return value && typeof value === "object" && !Array.isArray(value)
             ? value as Record<string, unknown>
             : null;
-        } catch { return null; }
+        } catch {
+          return null;
+        }
       }
     }
   }
   return null;
 }
-
 
 export const onRequestPost = async ({ request, env }: PagesFunctionContext<Env>): Promise<Response> => {
   const requestOrigin = request.headers.get("Origin");
@@ -74,10 +78,8 @@ export const onRequestPost = async ({ request, env }: PagesFunctionContext<Env>)
     requestId: crypto.randomUUID(),
     transport: "json"
   });
+
   try {
-    // Server-to-server: browser CORS and iframe restrictions do not apply.
-    // Apps Script ContentService may redirect to script.googleusercontent.com;
-    // the Fetch API follows that redirect automatically.
     const upstream = await fetch(env.ATHAR_GAS_ENDPOINT, {
       method: "POST",
       headers: { "Content-Type": "application/x-www-form-urlencoded;charset=UTF-8" },
@@ -85,20 +87,22 @@ export const onRequestPost = async ({ request, env }: PagesFunctionContext<Env>)
       redirect: "follow"
     });
     const rawResult = await upstream.text();
+
     let result: Record<string, unknown>;
     try {
       const parsed = JSON.parse(rawResult);
       if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) throw new Error("invalid");
       result = parsed as Record<string, unknown>;
     } catch {
-      // Backward compatibility: the currently deployed Apps Script may still
-      // return its legacy HTML postMessage envelope instead of JSON. Parse the
-      // embedded result as data; never execute HTML or replay the POST.
       const legacyResult = extractLegacyGasPayload(rawResult);
       if (legacyResult) return jsonResponse(legacyResult, upstream.ok ? 200 : 502);
+
       // Never replay: Apps Script may have completed a write before its response was lost.
       const isPing = payload.action === "ping";
-      const preview = isPing ? rawResult.replace(/<script[\\s\\S]*?<\\/script>/gi, "[script]").replace(/<[^>]*>/g, " ").replace(/\\s+/g, " ").slice(0, 240) : undefined;
+      const preview = isPing
+        ? rawResult.replace(/<script[\s\S]*?<\/script>/gi, "[script]")
+            .replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").slice(0, 240)
+        : undefined;
       return jsonResponse({
         success: false,
         error: "تعذرت قراءة استجابة Google. لم نُعِد إرسال الطلب لتجنب تكرار عملية الحفظ.",
@@ -106,7 +110,10 @@ export const onRequestPost = async ({ request, env }: PagesFunctionContext<Env>)
           diagnostic: {
             upstreamStatus: upstream.status,
             contentType: upstream.headers.get("content-type") || "unknown",
-            finalHost: (() => { try { return new URL(upstream.url).hostname; } catch { return "unknown"; } })(),
+            finalHost: (() => {
+              try { return new URL(upstream.url).hostname; }
+              catch { return "unknown"; }
+            })(),
             responsePreview: preview
           }
         } : {})

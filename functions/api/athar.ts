@@ -10,6 +10,42 @@ function jsonResponse(body: Record<string, unknown>, status = 200): Response {
 }
 
 type PagesFunctionContext<E> = { request: Request; env: E };
+function extractLegacyGasPayload(html: string): Record<string, unknown> | null {
+  // Older deployed Apps Script versions return an HTML page whose script
+  // posts the operation result to the parent window. Extract only that JSON
+  // object; never execute the returned HTML or its script.
+  const marker = "payload:";
+  const startMarker = html.indexOf(marker);
+  if (startMarker < 0) return null;
+  let start = startMarker + marker.length;
+  while (/\\s/.test(html[start] || "")) start++;
+  if (html[start] !== "{") return null;
+  let depth = 0, inString = false, escaped = false;
+  for (let i = start; i < html.length; i++) {
+    const ch = html[i];
+    if (inString) {
+      if (escaped) escaped = false;
+      else if (ch === "\\\\") escaped = true;
+      else if (ch === '"') inString = false;
+      continue;
+    }
+    if (ch === '"') inString = true;
+    else if (ch === "{") depth++;
+    else if (ch === "}") {
+      depth--;
+      if (depth === 0) {
+        try {
+          const value = JSON.parse(html.slice(start, i + 1));
+          return value && typeof value === "object" && !Array.isArray(value)
+            ? value as Record<string, unknown>
+            : null;
+        } catch { return null; }
+      }
+    }
+  }
+  return null;
+}
+
 
 export const onRequestPost = async ({ request, env }: PagesFunctionContext<Env>): Promise<Response> => {
   const requestOrigin = request.headers.get("Origin");
@@ -55,6 +91,11 @@ export const onRequestPost = async ({ request, env }: PagesFunctionContext<Env>)
       if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) throw new Error("invalid");
       result = parsed as Record<string, unknown>;
     } catch {
+      // Backward compatibility: the currently deployed Apps Script may still
+      // return its legacy HTML postMessage envelope instead of JSON. Parse the
+      // embedded result as data; never execute HTML or replay the POST.
+      const legacyResult = extractLegacyGasPayload(rawResult);
+      if (legacyResult) return jsonResponse(legacyResult, upstream.ok ? 200 : 502);
       // Never replay: Apps Script may have completed a write before its response was lost.
       const isPing = payload.action === "ping";
       const preview = isPing ? rawResult.replace(/<script[\\s\\S]*?<\\/script>/gi, "[script]").replace(/<[^>]*>/g, " ").replace(/\\s+/g, " ").slice(0, 240) : undefined;

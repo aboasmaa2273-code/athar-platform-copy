@@ -9,7 +9,9 @@ function jsonResponse(body: Record<string, unknown>, status = 200): Response {
   });
 }
 
-export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
+type PagesFunctionContext<E> = { request: Request; env: E };
+
+export const onRequestPost = async ({ request, env }: PagesFunctionContext<Env>): Promise<Response> => {
   const requestOrigin = request.headers.get("Origin");
   const pageOrigin = new URL(request.url).origin;
   if (requestOrigin && requestOrigin !== pageOrigin) {

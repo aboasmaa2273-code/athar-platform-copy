@@ -12,20 +12,25 @@ function jsonResponse(body: Record<string, unknown>, status = 200): Response {
 type PagesFunctionContext<E> = { request: Request; env: E };
 
 function extractLegacyGasPayload(html: string): Record<string, unknown> | null {
-  // Extract the JSON data embedded in the legacy Apps Script postMessage
-  // envelope. Never execute returned HTML or JavaScript.
-  const marker = "payload:";
-  const markerIndex = html.indexOf(marker);
+  // Apps Script sometimes HTML-escapes the postMessage envelope as JavaScript
+  // hex escapes (for example \x7b and \x22). Decode only those escapes;
+  // never execute returned HTML or JavaScript.
+  const markerIndex = html.indexOf("payload:");
   if (markerIndex < 0) return null;
-  let start = markerIndex + marker.length;
-  while (/\s/.test(html[start] || "")) start++;
-  if (html[start] !== "{") return null;
+
+  const scriptEnd = html.indexOf("</script>", markerIndex);
+  const encoded = html.slice(markerIndex + "payload:".length, scriptEnd < 0 ? undefined : scriptEnd);
+  const decoded = encoded.replace(/\\+x([0-9a-fA-F]{2})/g, (_match, hex: string) =>
+    String.fromCharCode(parseInt(hex, 16))
+  );
+  const start = decoded.indexOf("{");
+  if (start < 0) return null;
 
   let depth = 0;
   let inString = false;
   let escaped = false;
-  for (let i = start; i < html.length; i++) {
-    const ch = html[i];
+  for (let i = start; i < decoded.length; i++) {
+    const ch = decoded[i];
     if (inString) {
       if (escaped) escaped = false;
       else if (ch === "\\") escaped = true;
@@ -38,7 +43,7 @@ function extractLegacyGasPayload(html: string): Record<string, unknown> | null {
       depth--;
       if (depth === 0) {
         try {
-          const value = JSON.parse(html.slice(start, i + 1));
+          const value = JSON.parse(decoded.slice(start, i + 1));
           return value && typeof value === "object" && !Array.isArray(value)
             ? value as Record<string, unknown>
             : null;

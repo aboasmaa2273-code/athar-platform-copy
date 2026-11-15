@@ -103,20 +103,28 @@ export const onRequestPost = async ({ request, env }: PagesFunctionContext<Env>)
         ? rawResult.replace(/<script[\s\S]*?<\/script>/gi, "[script]")
             .replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").slice(0, 240)
         : undefined;
+      const titleMatch = isPing ? rawResult.match(/<title[^>]*>([\s\S]*?)<\/title>/i) : null;
+      const diagnostic = isPing ? {
+        upstreamStatus: upstream.status,
+        contentType: upstream.headers.get("content-type") || "unknown",
+        finalHost: (() => {
+          try { return new URL(upstream.url).hostname; }
+          catch { return "unknown"; }
+        })(),
+        responsePreview: preview,
+        legacyPayloadMarkerFound: rawResult.includes("payload:"),
+        legacyPayloadStart: (() => {
+          const i = rawResult.indexOf("payload:");
+          return i < 0 ? null : rawResult.slice(i, i + 48);
+        })(),
+        htmlTitle: titleMatch ? titleMatch[1].replace(/<[^>]*>/g, "").slice(0, 120) : null,
+        looksLikeGoogleSignIn: /accounts\.google\.com|ServiceLogin|sign in to continue/i.test(rawResult),
+        containsAppsScriptEnvelope: rawResult.includes("ATHAR_DB_RESULT")
+      } : undefined;
       return jsonResponse({
         success: false,
         error: "تعذرت قراءة استجابة Google. لم نُعِد إرسال الطلب لتجنب تكرار عملية الحفظ.",
-        ...(isPing ? {
-          diagnostic: {
-            upstreamStatus: upstream.status,
-            contentType: upstream.headers.get("content-type") || "unknown",
-            finalHost: (() => {
-              try { return new URL(upstream.url).hostname; }
-              catch { return "unknown"; }
-            })(),
-            responsePreview: preview
-          }
-        } : {})
+        ...(isPing ? { diagnostic } : {})
       }, 502);
     }
     return jsonResponse(result, upstream.ok ? 200 : 502);

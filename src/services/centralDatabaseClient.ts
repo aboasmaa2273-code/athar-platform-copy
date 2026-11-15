@@ -103,17 +103,14 @@ export class CentralDatabaseClient {
             host === 'script.googleusercontent.com' ||
             host.endsWith('.script.googleusercontent.com');
         } catch { /* reject opaque or malformed origins */ }
-        // Apps Script may serve the HTML response through a redirected Google
-        // response frame. Validate the Google origin and this request's
-        // cryptographically random correlation ID; do not require WindowProxy
-        // identity, which can be unreliable across that redirect flow.
-        // Some Apps Script HtmlService sandbox responses report an opaque
-        // origin ("null"). In that case accept a message only from this exact
-        // request iframe; the unguessable requestId below is still mandatory.
-        const trustedOpaqueFrame = event.origin === 'null' && event.source === iframe.contentWindow;
-        if (!trustedGoogleOrigin && !trustedOpaqueFrame) return;
+        // Apps Script HtmlService can deliver its response from a nested
+        // sandbox frame whose origin is opaque ("null") and whose WindowProxy
+        // is not the outer form-target iframe. Accept Google origins, or an
+        // opaque-origin message only after matching this request's unguessable
+        // correlation ID and response type.
         const data = event.data;
         if (!data || data.type !== RESPONSE_TYPE || data.requestId !== requestId) return;
+        if (!trustedGoogleOrigin && event.origin !== 'null') return;
         finish(data.payload as CentralApiResponse<T>);
       };
       const timer = window.setTimeout(

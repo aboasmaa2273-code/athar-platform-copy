@@ -333,19 +333,25 @@ function doPost(e) {
     const body=JSON.parse((e.parameter && e.parameter.payload)||'{}');
     result=atharApiWrite_(body);
   } catch(err) { result={success:false,error:String(err.message||err)}; }
+  // New JSON transport for the server-side proxy. The legacy HTML response remains
+  // available to the existing GitHub Pages deployment until the new host is activated.
+  if (String((e && e.parameter && e.parameter.transport) || '') === 'json') {
+    return ContentService
+      .createTextOutput(JSON.stringify(result))
+      .setMimeType(ContentService.MimeType.JSON);
+  }
   // Escape every value embedded in the HTML script context. In particular,
   // never interpolate an arbitrary requestId containing a literal </script>.
   const safe=JSON.stringify(result)
     .replace(/</g,'\\u003c')
     .replace(/>/g,'\\u003e')
     .replace(/&/g,'\\u0026')
-    .replace(/\u2028/g,'\\u2028')
-    .replace(/\u2029/g,'\\u2029');
+    .replace(/\\u2028/g,'\\u2028')
+    .replace(/\\u2029/g,'\\u2029');
   const rawRequestId=String((e && e.parameter && e.parameter.requestId)||'');
   const requestIdValue=/^[A-Za-z0-9-]{1,80}$/.test(rawRequestId) ? rawRequestId : '';
   const requestId=JSON.stringify(requestIdValue);
-  // The client communicates through a hidden cross-origin iframe. The response
-  // contains no UI or secrets and posts only to the fixed trusted Pages origin.
+  // Legacy hidden-iframe transport retained for the current deployment.
   return HtmlService.createHtmlOutput('<!doctype html><meta charset="utf-8"><script>window.top.postMessage({type:"ATHAR_DB_RESULT",requestId:'+requestId+',payload:'+safe+'},"https://aboasmaa2273-code.github.io");</script>')
     .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
 }

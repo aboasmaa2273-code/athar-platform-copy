@@ -56,9 +56,19 @@ export const onRequestPost = async ({ request, env }: PagesFunctionContext<Env>)
       result = parsed as Record<string, unknown>;
     } catch {
       // Never replay: Apps Script may have completed a write before its response was lost.
+      const isPing = payload.action === "ping";
+      const preview = isPing ? rawResult.replace(/<script[\\s\\S]*?<\\/script>/gi, "[script]").replace(/<[^>]*>/g, " ").replace(/\\s+/g, " ").slice(0, 240) : undefined;
       return jsonResponse({
         success: false,
-        error: "تعذرت قراءة استجابة Google. لم نُعِد إرسال الطلب لتجنب تكرار عملية الحفظ."
+        error: "تعذرت قراءة استجابة Google. لم نُعِد إرسال الطلب لتجنب تكرار عملية الحفظ.",
+        ...(isPing ? {
+          diagnostic: {
+            upstreamStatus: upstream.status,
+            contentType: upstream.headers.get("content-type") || "unknown",
+            finalHost: (() => { try { return new URL(upstream.url).hostname; } catch { return "unknown"; } })(),
+            responsePreview: preview
+          }
+        } : {})
       }, 502);
     }
     return jsonResponse(result, upstream.ok ? 200 : 502);

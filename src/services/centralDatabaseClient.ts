@@ -4,7 +4,7 @@
  */
 const CONFIG_KEY = 'athar_central_database_endpoint_v1';
 // Default central Apps Script endpoint for the published Ather deployment.
-const DEFAULT_CENTRAL_ENDPOINT = 'https://script.google.com/macros/s/AKfycby0GnPx90wkpyZewfID_vDFMYlKm054lNebVhYgRd5nUqZrOOKqauobVr4XjKiJQD3M/exec';
+const DEFAULT_CENTRAL_ENDPOINT = 'https://script.google.com/macros/s/AKfycbxyU04mNPd4e0qdV_hYLFy2zMwBjwftg-hxgKdxS8vjrIfQdjN1UpTC412AIrFv7bU/exec';
 const RESPONSE_TYPE = 'ATHAR_DB_RESULT';
 const TRUSTED_PARENT_ORIGIN = 'https://aboasmaa2273-code.github.io';
 

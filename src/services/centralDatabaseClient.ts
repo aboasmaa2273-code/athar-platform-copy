@@ -50,7 +50,15 @@ export class CentralDatabaseClient {
   static async request<T = unknown>(payload: Record<string, unknown>, timeoutMs = 20000): Promise<CentralApiResponse<T>> {
     const endpoint = this.getEndpoint();
     if (!endpoint) return { success: false, error: 'لم يُضبط رابط قاعدة البيانات المركزية بعد.' };
-    if (typeof window === 'undefined' || window.location.origin !== TRUSTED_PARENT_ORIGIN) {
+    if (typeof window === 'undefined') {
+      return { success: false, error: 'تعذر تحديد نافذة المنصة.' };
+    }
+    // Enabled only in the separate Cloudflare Pages build; GitHub Pages stays unchanged.
+    const transport = (import.meta as ImportMeta & { env?: Record<string, string | undefined> }).env?.VITE_ATHAR_API_TRANSPORT;
+    if (transport === 'proxy') {
+      return this.requestViaProxy<T>(payload, timeoutMs);
+    }
+    if (window.location.origin !== TRUSTED_PARENT_ORIGIN) {
       return { success: false, error: 'اتصال قاعدة البيانات متاح من نطاق منصة أَثَر المنشور فقط.' };
     }
 
@@ -128,6 +136,37 @@ export class CentralDatabaseClient {
     });
   }
 
+
+  /** Same-origin Cloudflare Function transport; avoids browser iframe messaging. */
+  private static async requestViaProxy<T = unknown>(
+    payload: Record<string, unknown>,
+    timeoutMs: number
+  ): Promise<CentralApiResponse<T>> {
+    const controller = new AbortController();
+    const timer = window.setTimeout(() => controller.abort(), timeoutMs);
+    try {
+      const response = await fetch('/api/athar', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+        credentials: 'same-origin',
+        cache: 'no-store',
+        signal: controller.signal
+      });
+      const data = await response.json() as CentralApiResponse<T>;
+      if (!response.ok) {
+        return { ...data, success: false, error: data.error || `تعذر الاتصال بوسيط قاعدة البيانات (HTTP ${response.status}).` };
+      }
+      return data;
+    } catch (error) {
+      if (error instanceof DOMException && error.name === 'AbortError') {
+        return { success: false, error: 'انتهت مهلة الاتصال بوسيط قاعدة البيانات.' };
+      }
+      return { success: false, error: 'تعذر الوصول إلى وسيط قاعدة البيانات؛ لم يتم تأكيد تنفيذ الطلب.' };
+    } finally {
+      window.clearTimeout(timer);
+    }
+  }
 
   /** تسجيل الدخول المركزي؛ لا يحفظ كلمة المرور، ويحفظ رمز الجلسة في sessionStorage فقط. */
   static async login(username: string, password: string): Promise<CentralApiResponse<CentralSession>> {

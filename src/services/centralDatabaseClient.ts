@@ -84,6 +84,7 @@ export class CentralDatabaseClient {
     return new Promise(resolve => {
       let settled = false;
       let iframeLoaded = false;
+      let iframeLoadCount = 0;
       const observedMessages: string[] = [];
       const finish = (result: CentralApiResponse<T>) => {
         if (settled) return;
@@ -95,7 +96,7 @@ export class CentralDatabaseClient {
         iframe.remove();
         resolve(result);
       };
-      const onFrameLoad = () => { iframeLoaded = true; };
+      const onFrameLoad = () => { iframeLoaded = true; iframeLoadCount += 1; };
       const onMessage = (event: MessageEvent) => {
         // Record only non-sensitive message metadata to diagnose failed handshakes.
         const data = event.data;
@@ -117,7 +118,7 @@ export class CentralDatabaseClient {
         finish(data.payload as CentralApiResponse<T>);
       };
       const timer = window.setTimeout(() => {
-        const details = `تحميل إطار الرد: ${iframeLoaded ? 'نعم' : 'لا'}؛ رسائل مستلمة: ${observedMessages.length ? observedMessages.join(' | ') : 'لا توجد'}`;
+        const details = `تحميل إطار الرد: ${iframeLoaded ? 'نعم' : 'لا'} (مرات التحميل: ${iframeLoadCount})؛ رسائل مستلمة: ${observedMessages.length ? observedMessages.join(' | ') : 'لا توجد'}`;
         finish({ success: false, error: `انتهت مهلة الاتصال بالخادم. (${details})` });
       }, timeoutMs);
       iframe.addEventListener('load', onFrameLoad);

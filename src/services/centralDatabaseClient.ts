@@ -107,7 +107,11 @@ export class CentralDatabaseClient {
         // response frame. Validate the Google origin and this request's
         // cryptographically random correlation ID; do not require WindowProxy
         // identity, which can be unreliable across that redirect flow.
-        if (!trustedGoogleOrigin) return;
+        // Some Apps Script HtmlService sandbox responses report an opaque
+        // origin ("null"). In that case accept a message only from this exact
+        // request iframe; the unguessable requestId below is still mandatory.
+        const trustedOpaqueFrame = event.origin === 'null' && event.source === iframe.contentWindow;
+        if (!trustedGoogleOrigin && !trustedOpaqueFrame) return;
         const data = event.data;
         if (!data || data.type !== RESPONSE_TYPE || data.requestId !== requestId) return;
         finish(data.payload as CentralApiResponse<T>);

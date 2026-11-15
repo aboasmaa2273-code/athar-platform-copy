@@ -93,14 +93,15 @@ export class CentralDatabaseClient {
         resolve(result);
       };
       const onMessage = (event: MessageEvent) => {
-        // Accept responses only from the exact iframe created for this request and
-        // from Google's Apps Script response hosts; source + requestId prevent
-        // unrelated windows from resolving an in-flight database operation.
+        // Apps Script may serve the POST response from a regional
+        // script.googleusercontent.com subdomain after redirecting.
+        // Trust only the Apps Script hosts, then require this request's random ID.
         let trustedGoogleOrigin = false;
         try {
-          const host = new URL(event.origin).hostname;
+          const host = new URL(event.origin).hostname.toLowerCase();
           trustedGoogleOrigin = host === 'script.google.com' ||
-            host === 'script.googleusercontent.com';
+            host === 'script.googleusercontent.com' ||
+            host.endsWith('.script.googleusercontent.com');
         } catch { /* reject opaque or malformed origins */ }
         // Apps Script may serve the HTML response through a redirected Google
         // response frame. Validate the Google origin and this request's
